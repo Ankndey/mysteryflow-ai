@@ -52,6 +52,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.shell{display:g
   <div class="field"><label>Story type</label><select id="scriptType"><option>Mystery</option><option>True Crime</option><option>Unsolved Case</option><option>Historical Mystery</option><option>Horror Story (fiction)</option></select></div>
   <div class="field"><label>Narration style</label><select id="scriptTone"><option>Cinematic & suspenseful</option><option>Documentary & factual</option><option>Conversational Bengali storytelling</option></select></div>
   <div class="field full"><label>Verified story facts / outline (add only details you can support)</label><textarea id="scriptFacts" placeholder="What happened? When and where? What is confirmed? What remains unknown? Add source URLs or references."></textarea></div>
+  <div class="field full"><label>বাংলায় ঘটনার বিবরণ (পশ্চিমবঙ্গের বাংলা)</label><textarea id="scriptFactsBN" placeholder="একই ঘটনার বিবরণ স্বাভাবিক বাংলায় লিখুন। এটি বাংলা স্ক্রিপ্টে ব্যবহার হবে।"></textarea></div>
  </div>
  <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn primary" id="generateScript">✦ Build English + Indian Bengali drafts</button><button class="btn" id="copyScriptPrompt">Copy AI writing brief</button></div>
  <div id="scriptOutput" style="display:none;margin-top:18px">
@@ -99,11 +100,13 @@ $('saveSeo').onclick=()=>alert('SEO draft saved for this session only in this MV
 function makeDrafts(){
  const title=$('scriptTitle').value.trim();
  const facts=$('scriptFacts').value.trim();
+ const factsBN=$('scriptFactsBN').value.trim();
  const fmt=$('scriptFormat').value;
  const type=$('scriptType').value;
  const tone=$('scriptTone').value;
  if(!title){alert('আগে Video title লিখুন।');return;}
- if(!facts){alert('ঘটনার তথ্য / গল্পের outline যোগ করুন।');return;}
+ if(!facts){alert('English facts / story outline যোগ করুন।');return;}
+ if(!factsBN){alert('সম্পূর্ণ বাংলা স্ক্রিপ্টের জন্য একই ঘটনার বাংলা বিবরণও লিখুন।');return;}
  const short=fmt==='short'||fmt==='both', long=fmt==='long'||fmt==='both';
  const safeTitle=title;
  const sourceNote='তথ্য যাচাই করুন। বাস্তব ঘটনা হলে প্রতিটি দাবির পাশে নির্ভরযোগ্য সূত্র দিন।';
@@ -121,7 +124,7 @@ function makeDrafts(){
 }
 $('generateScript').onclick=makeDrafts;
 $('copyScriptPrompt').onclick=()=>{const t=$('scriptTitle').value.trim(),f=$('scriptFacts').value.trim();if(!t||!f){alert('Video title এবং ঘটনার outline যোগ করুন।');return;}const p=`Create a polished YouTube script package for “${t}” in English and natural West Bengal Indian Bengali. Format: ${$('scriptFormat').value}. Story type: ${$('scriptType').value}. Tone: ${$('scriptTone').value}. Write distinct Shorts and Long versions, with separate 9:16 and 16:9 scene directions and SEO in both languages. Do not repeat the raw outline as narration. Do not invent facts, evidence, dialogue or motives. Clearly mark fiction as fiction and distinguish confirmed facts from theories.\n\nSource outline:\n${f}`;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(p).then(()=>alert('AI writing brief copied.')).catch(()=>alert(p));else alert(p);};
-$('saveScript').onclick=()=>{const title=$('scriptTitle').value.trim();if(!title||!$('scriptFacts').value.trim()){alert('আগে title এবং story outline যোগ করুন।');return;}if(!$('scriptEN').value.trim()||!$('scriptBN').value.trim()){alert('আগে bilingual draft তৈরি করুন।');return;}const formats=$('scriptFormat').value==='both'?['Shorts · 9:16 · 30–60 sec','Long · 16:9 · 5–10 min']:[$('scriptFormat').value==='short'?'Shorts · 9:16 · 30–60 sec':'Long · 16:9 · 5–10 min'];formats.forEach(f=>jobs.push({title,format:f,language:'English + Indian Bengali',status:'Draft saved · rendering not connected',date:new Date().toLocaleDateString()}));save();alert('Drafts saved in this browser on this device. MP4 rendering is not connected.');showPage('production');};
+$('saveScript').onclick=()=>{const title=$('scriptTitle').value.trim();if(!title||!$('scriptFacts').value.trim()||!$('scriptFactsBN').value.trim()){alert('Title এবং English ও বাংলা—দুই ভাষার story outline যোগ করুন।');return;}if(!$('scriptEN').value.trim()||!$('scriptBN').value.trim()){alert('আগে bilingual draft তৈরি করুন।');return;}const formats=$('scriptFormat').value==='both'?['Shorts · 9:16 · 30–60 sec','Long · 16:9 · 5–10 min']:[$('scriptFormat').value==='short'?'Shorts · 9:16 · 30–60 sec':'Long · 16:9 · 5–10 min'];formats.forEach(f=>jobs.push({title,format:f,language:'English + Indian Bengali',status:'Draft saved · rendering not connected',date:new Date().toLocaleDateString()}));save();alert('Drafts saved in this browser on this device. MP4 rendering is not connected.');showPage('production');};
 
 render();
 </script></body></html>
