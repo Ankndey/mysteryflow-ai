@@ -66,6 +66,15 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.shell{display:g
    <div class="field"><label>YouTube Title + Description + Tags (বাংলা)</label><textarea id="seoBN"></textarea></div>
   </div>
   <button class="btn primary" style="margin-top:13px" id="saveScript">Save drafts & create production jobs</button>
+  <div class="card" id="voiceoverPanel" style="margin-top:16px;background:#0b1422">
+   <div class="sectionhead"><h3>AI Voiceover Studio · v0.4</h3><span class="badge warn">WAV export</span></div>
+   <div class="notice">Generate separate narration audio for each language. Edit the narration before generating. First test limit: 6,500 characters per language. Long scripts may need to be split into scenes.</div>
+   <div class="formgrid" style="margin-top:13px">
+    <div class="field"><label>English narration text</label><textarea id="voiceTextEN" placeholder="Generated English script will appear here."></textarea><button class="btn primary" id="makeVoiceEN">Generate English voiceover</button><audio id="voiceAudioEN" controls style="width:100%;display:none"></audio><a id="downloadVoiceEN" class="btn" style="display:none;text-align:center" download="mysteryflow-english-voiceover.wav">Download English WAV</a></div>
+    <div class="field"><label>বাংলা narration text</label><textarea id="voiceTextBN" placeholder="বাংলা স্ক্রিপ্ট এখানে আসবে।"></textarea><button class="btn primary" id="makeVoiceBN">বাংলা Voiceover তৈরি করুন</button><audio id="voiceAudioBN" controls style="width:100%;display:none"></audio><a id="downloadVoiceBN" class="btn" style="display:none;text-align:center" download="mysteryflow-bengali-voiceover.wav">বাংলা WAV Download</a></div>
+   </div>
+   <div id="voiceStatus" class="small muted" style="margin-top:12px">Voiceover তৈরি করতে English বা বাংলা বোতাম চাপুন।</div>
+  </div>
  </div>
 </div></section>
 
@@ -142,6 +151,8 @@ async function generateWithAI(){
   $('seoEN').value=r.seo_en||'';
   $('seoBN').value=r.seo_bn||'';
   $('scriptOutput').style.display='block';
+  $('voiceTextEN').value=r.english_script||'';
+  $('voiceTextBN').value=r.bengali_script||'';
   $('scriptOutput').scrollIntoView({behavior:'smooth',block:'start'});
   alert('Gemini AI সফলভাবে English + বাংলা draft তৈরি করেছে। তথ্য ও সূত্র যাচাই করে নাও।');
  }catch(e){
@@ -151,6 +162,27 @@ async function generateWithAI(){
 $('generateScript').onclick=generateWithAI;
 $('copyScriptPrompt').onclick=()=>{const t=$('scriptTitle').value.trim(),f=$('scriptFacts').value.trim();if(!t||!f){alert('Video title এবং ঘটনার outline যোগ করুন।');return;}const p=`Create a polished YouTube script package for “${t}” in English and natural West Bengal Indian Bengali. Format: ${$('scriptFormat').value}. Story type: ${$('scriptType').value}. Tone: ${$('scriptTone').value}. Write distinct Shorts and Long versions, with separate 9:16 and 16:9 scene directions and SEO in both languages. Do not repeat the raw outline as narration. Do not invent facts, evidence, dialogue or motives. Clearly mark fiction as fiction and distinguish confirmed facts from theories.\n\nSource outline:\n${f}`;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(p).then(()=>alert('AI writing brief copied.')).catch(()=>alert(p));else alert(p);};
 $('saveScript').onclick=()=>{const title=$('scriptTitle').value.trim();if(!title||!$('scriptFacts').value.trim()||!$('scriptFactsBN').value.trim()){alert('Title এবং English ও বাংলা—দুই ভাষার story outline যোগ করুন।');return;}if(!$('scriptEN').value.trim()||!$('scriptBN').value.trim()){alert('আগে bilingual draft তৈরি করুন।');return;}const formats=$('scriptFormat').value==='both'?['Shorts · 9:16 · 30–60 sec','Long · 16:9 · 5–10 min']:[$('scriptFormat').value==='short'?'Shorts · 9:16 · 30–60 sec':'Long · 16:9 · 5–10 min'];formats.forEach(f=>jobs.push({title,format:f,language:'English + Indian Bengali',status:'Draft saved · rendering not connected',date:new Date().toLocaleDateString()}));save();alert('Drafts saved in this browser on this device. MP4 rendering is not connected.');showPage('production');};
+
+
+async function makeVoiceover(lang){
+ const isBN=lang==='bn', text=(isBN?$('voiceTextBN').value:$('voiceTextEN').value).trim();
+ if(!text){alert(isBN?'বাংলা narration text লিখুন।':'Add English narration text first.');return;}
+ if(text.length>6500){alert('এই প্রথম সংস্করণে ৬,৫০০ অক্ষরের মধ্যে রাখুন। Shorts বা Long-এর একটি অংশ আলাদা করে দিন।');return;}
+ const btn=$(isBN?'makeVoiceBN':'makeVoiceEN'), old=btn.textContent;
+ btn.disabled=true;btn.textContent='⏳ Voice তৈরি হচ্ছে...';$('voiceStatus').textContent='Gemini TTS audio তৈরি করছে—এতে কিছুক্ষণ সময় লাগতে পারে।';
+ try{
+  const res=await fetch('https://mysteryflow-api.pratikdey584.workers.dev/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,language:lang,voice:'Kore'})});
+  const data=await res.json();if(!res.ok||!data.success)throw new Error(data.error||'TTS generation failed.');
+  const binary=atob(data.audioBase64), bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  const blob=new Blob([bytes],{type:data.mimeType||'audio/wav'}), url=URL.createObjectURL(blob);
+  const audio=$(isBN?'voiceAudioBN':'voiceAudioEN'), link=$(isBN?'downloadVoiceBN':'downloadVoiceEN');
+  audio.src=url;audio.style.display='block';link.href=url;link.style.display='block';
+  $('voiceStatus').textContent=(isBN?'বাংলা':'English')+' voiceover তৈরি হয়েছে। WAV ফাইলটি শুনে Download করুন।';
+ }catch(e){$('voiceStatus').textContent='Voiceover error: '+e.message;alert('Voiceover তৈরি হয়নি: '+e.message);}
+ finally{btn.disabled=false;btn.textContent=old;}
+}
+$('makeVoiceEN').onclick=()=>makeVoiceover('en');
+$('makeVoiceBN').onclick=()=>makeVoiceover('bn');
 
 render();
 </script></body></html>
