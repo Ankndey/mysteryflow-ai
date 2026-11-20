@@ -122,7 +122,33 @@ function makeDrafts(){
  $('seoBN').value='শিরোনাম: '+title+' | বন্ধ ঘরের রহস্য\\nবিবরণ: '+title+'-এর সূত্র ও অমীমাংসিত প্রশ্ন নিয়ে একটি কাল্পনিক রহস্যকাহিনি। এটি বাস্তব ঘটনা নয়।\\nট্যাগ: রহস্য, বন্ধ ঘর, সাসপেন্স, বাংলা গল্প';
  $('scriptOutput').style.display='block';
 }
-$('generateScript').onclick=makeDrafts;
+async function generateWithAI(){
+ const title=$('scriptTitle').value.trim(), facts=$('scriptFacts').value.trim(), factsBN=$('scriptFactsBN').value.trim();
+ if(!title||!facts||!factsBN){alert('Video title এবং English ও বাংলা—দুই ভাষার story outline পূরণ করুন।');return;}
+ const btn=$('generateScript'), oldText=btn.textContent;
+ btn.disabled=true; btn.textContent='⏳ Gemini AI লিখছে...';
+ try{
+  const res=await fetch('https://mysteryflow-api.pratikdey584.workers.dev/generate',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({title,format:$('scriptFormat').value,type:$('scriptType').value,tone:$('scriptTone').value,facts,factsBN})
+  });
+  const data=await res.json();
+  if(!res.ok||!data.success) throw new Error(data.error||'AI generation failed.');
+  const r=data.result||{};
+  $('scriptEN').value=r.english_script||'';
+  $('scriptBN').value=r.bengali_script||'';
+  $('visualEN').value=r.visual_en||'';
+  $('visualBN').value=r.visual_bn||'';
+  $('seoEN').value=r.seo_en||'';
+  $('seoBN').value=r.seo_bn||'';
+  $('scriptOutput').style.display='block';
+  $('scriptOutput').scrollIntoView({behavior:'smooth',block:'start'});
+  alert('Gemini AI সফলভাবে English + বাংলা draft তৈরি করেছে। তথ্য ও সূত্র যাচাই করে নাও।');
+ }catch(e){
+  alert('AI generation error: '+e.message+'\n\nWorker secret ও deployment status পরীক্ষা করো।');
+ }finally{btn.disabled=false;btn.textContent=oldText;}
+}
+$('generateScript').onclick=generateWithAI;
 $('copyScriptPrompt').onclick=()=>{const t=$('scriptTitle').value.trim(),f=$('scriptFacts').value.trim();if(!t||!f){alert('Video title এবং ঘটনার outline যোগ করুন।');return;}const p=`Create a polished YouTube script package for “${t}” in English and natural West Bengal Indian Bengali. Format: ${$('scriptFormat').value}. Story type: ${$('scriptType').value}. Tone: ${$('scriptTone').value}. Write distinct Shorts and Long versions, with separate 9:16 and 16:9 scene directions and SEO in both languages. Do not repeat the raw outline as narration. Do not invent facts, evidence, dialogue or motives. Clearly mark fiction as fiction and distinguish confirmed facts from theories.\n\nSource outline:\n${f}`;if(navigator.clipboard?.writeText)navigator.clipboard.writeText(p).then(()=>alert('AI writing brief copied.')).catch(()=>alert(p));else alert(p);};
 $('saveScript').onclick=()=>{const title=$('scriptTitle').value.trim();if(!title||!$('scriptFacts').value.trim()||!$('scriptFactsBN').value.trim()){alert('Title এবং English ও বাংলা—দুই ভাষার story outline যোগ করুন।');return;}if(!$('scriptEN').value.trim()||!$('scriptBN').value.trim()){alert('আগে bilingual draft তৈরি করুন।');return;}const formats=$('scriptFormat').value==='both'?['Shorts · 9:16 · 30–60 sec','Long · 16:9 · 5–10 min']:[$('scriptFormat').value==='short'?'Shorts · 9:16 · 30–60 sec':'Long · 16:9 · 5–10 min'];formats.forEach(f=>jobs.push({title,format:f,language:'English + Indian Bengali',status:'Draft saved · rendering not connected',date:new Date().toLocaleDateString()}));save();alert('Drafts saved in this browser on this device. MP4 rendering is not connected.');showPage('production');};
 
