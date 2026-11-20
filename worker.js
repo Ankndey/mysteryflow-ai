@@ -15,8 +15,42 @@ export default {
     if (url.pathname === "/" || url.pathname === "/health") {
       return json({ app: "MysteryFlow AI", status: "API is running", version: "0.3.1", model: MODEL });
     }
+    if (url.pathname === "/tts" && request.method === "POST") {
+      if (!env.GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY secret is missing in this Worker." }, 500);
+      let input;
+      try { input = await request.json(); } catch { return json({ error: "Invalid JSON request." }, 400); }
+      const text = String(input?.text || "").trim();
+      const language = input?.language === "bn" ? "Bengali" : "English";
+      const voice = String(input?.voice || "Kore");
+      if (!text) return json({ error: "Narration text is required." }, 400);
+      if (text.length > 6500) return json({ error: "For this first voiceover test, keep each language script under 6,500 characters." }, 413);
+      const style = language === "Bengali"
+        ? "Speak in natural West Bengal Indian Bengali, clear documentary narration, warm low-pitched voice, measured pace, suspenseful but not theatrical. Read the text exactly; do not translate or add words."
+        : "Speak in clear Indian English, documentary narration, warm low-pitched voice, measured pace, suspenseful but not theatrical. Read the text exactly; do not add words.";
+      try {
+        const api = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-lite-tts:generateContent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: style + "\\n\\n" + text }] }],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+            }
+          })
+        });
+        const raw = await api.json();
+        if (!api.ok) return json({ error: raw?.error?.message || "Gemini TTS request failed.", provider_status: api.status }, api.status === 429 ? 429 : 502);
+        const part = raw?.candidates?.[0]?.content?.parts?.find(p => p.inlineData?.data || p.inline_data?.data);
+        const audio = part?.inlineData || part?.inline_data;
+        if (!audio?.data) return json({ error: "Gemini TTS returned no audio data." }, 502);
+        return json({ success: true, language, mimeType: audio.mimeType || audio.mime_type || "audio/wav", audioBase64: audio.data, model: "gemini-3.8-flash-lite-tts" });
+      } catch (err) {
+        return json({ error: "Could not reach Gemini TTS. Check Worker logs and try again." }, 502);
+      }
+    }
     if (url.pathname !== "/generate" || request.method !== "POST") {
-      return json({ error: "Not found. Use POST /generate." }, 404);
+      return json({ error: "Not found. Use POST /generate or POST /tts." }, 404);
     }
     if (!env.GEMINI_API_KEY) return json({ error: "GEMINI_API_KEY secret is missing in this Worker." }, 500);
     let data;
