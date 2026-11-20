@@ -21,7 +21,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.shell{display:g
 <button data-page="publishing"><span class="ico">▶</span>Publishing</button>
 <button data-page="analytics"><span class="ico">⌁</span>Analytics</button>
 <button data-page="settings"><span class="ico">⚙</span>Settings</button></nav>
-<div class="sidefoot">MVP v0.3 · TEMPLATE MODE<br>Cloud-ready frontend prototype</div></aside>
+<div class="sidefoot">MVP v0.5 · BROWSER RENDER<br>Cloud-ready frontend prototype</div></aside>
 <main class="main">
 <header class="top"><div><div class="eyebrow">MYSTERY & TRUE CRIME / CREATOR WORKSPACE</div><h1 id="pageTitle">Production Overview</h1></div><div class="topright"><span class="pill">● <b>DEMO MODE</b></span><button class="btn" id="newProject">＋ New video</button></div></header>
 <section class="page active" id="overview">
@@ -75,6 +75,20 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.shell{display:g
    </div>
    <div id="voiceStatus" class="small muted" style="margin-top:12px">Voiceover তৈরি করতে English বা বাংলা বোতাম চাপুন।</div>
   </div>
+  <div class="card" id="browserRenderPanel" style="margin-top:16px;background:#0b1422">
+   <div class="sectionhead"><h3>Browser Video Renderer · v0.5</h3><span class="badge good">WebM export</span></div>
+   <div class="notice">Render a simple animated mystery video in this browser using your generated voiceover and captions. No MP4/cloud rendering yet. Keep this tab open until export finishes.</div>
+   <div class="formgrid" style="margin-top:13px">
+    <div class="field"><label>Video format</label><select id="renderFormat"><option value="short">Shorts · Vertical 9:16</option><option value="long">Long · Horizontal 16:9</option></select></div>
+    <div class="field"><label>Narration language / audio</label><select id="renderLanguage"><option value="en">English voiceover</option><option value="bn">বাংলা voiceover</option></select></div>
+    <div class="field"><label>Video title on screen</label><input id="renderTitle" placeholder="Your mystery video title"></div>
+    <div class="field"><label>Visual theme</label><select id="renderTheme"><option value="noir">Noir mystery</option><option value="red">Crimson suspense</option><option value="blue">Midnight blue</option></select></div>
+   </div>
+   <button class="btn primary" id="renderVideo" style="margin-top:14px">▶ Render video in browser</button>
+   <div id="renderStatus" class="small muted" style="margin-top:12px">Generate an English or Bengali voiceover above, then render.</div>
+   <video id="renderPreview" controls playsinline style="display:none;width:100%;max-height:480px;margin-top:14px;border-radius:12px;background:#000"></video>
+   <a id="downloadRender" class="btn" style="display:none;text-align:center;margin-top:10px" download="mysteryflow-video.webm">Download WebM video</a>
+  </div>
  </div>
 </div></section>
 
@@ -87,7 +101,7 @@ button,input,textarea,select{font:inherit}button{cursor:pointer}.shell{display:g
 <section class="page" id="analytics"><div class="card"><div class="sectionhead"><h3>Channel analytics</h3><span class="badge warn">No channel data</span></div><div class="empty">Analytics will appear after YouTube OAuth is connected and real channel metrics are fetched. Demo numbers are intentionally not fabricated.</div></div></section>
 
 <section class="page" id="settings"><div class="grid twocol"><div class="card"><h3>Channel defaults</h3><div class="switchrow"><span>English + Bengali content</span><span class="badge good">Enabled</span></div><div class="switchrow"><span>Shorts · 9:16 · 1080p target</span><span class="badge good">Enabled</span></div><div class="switchrow"><span>Long videos · 16:9 · 1080p target</span><span class="badge good">Enabled</span></div><div class="switchrow"><span>True-crime safety gate</span><span class="badge good">Required</span></div></div><div class="card"><h3>Cloud integration checklist</h3><div class="activity">① <span style="flex:1">Cloudflare Pages deployment</span><span class="badge warn">Pending</span></div><div class="activity">② <span style="flex:1">Workers API + D1 database</span><span class="badge warn">Pending</span></div><div class="activity">③ <span style="flex:1">AI provider credentials</span><span class="badge warn">Pending</span></div><div class="activity">④ <span style="flex:1">Render worker / storage</span><span class="badge warn">Pending</span></div><div class="activity">⑤ <span style="flex:1">YouTube OAuth</span><span class="badge warn">Pending</span></div></div></div></section>
-<div class="footer">MYSTERYFLOW AI · MVP 0.3.1 · QUALITY FIX · VERIFY ALL FACTS · No external integrations are active</div>
+<div class="footer">MYSTERYFLOW AI · MVP 0.5 · BROWSER WEBM RENDER · VERIFY ALL FACTS</div>
 </main></div>
 <script>
 const $=id=>document.getElementById(id);let jobs=JSON.parse(localStorage.getItem('mf_jobs')||'[]'),topics=JSON.parse(localStorage.getItem('mf_topics')||'[]');
@@ -183,6 +197,66 @@ async function makeVoiceover(lang){
 }
 $('makeVoiceEN').onclick=()=>makeVoiceover('en');
 $('makeVoiceBN').onclick=()=>makeVoiceover('bn');
+
+function wrapCanvasText(ctx,text,maxWidth){
+ const words=String(text||'').split(/\s+/), lines=[];let line='';
+ for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}
+ if(line)lines.push(line);return lines;
+}
+async function renderBrowserVideo(){
+ const format=$('renderFormat').value, lang=$('renderLanguage').value;
+ const audio=$ (lang==='bn'?'voiceAudioBN':'voiceAudioEN');
+ if(!audio.src){alert(lang==='bn'?'আগে বাংলা voiceover তৈরি করুন।':'Generate the English voiceover first.');return;}
+ if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream){alert('এই browser-এ video recording support নেই। Chrome desktop ব্যবহার করুন।');return;}
+ const btn=$('renderVideo'),status=$('renderStatus'),old=btn.textContent;
+ btn.disabled=true;btn.textContent='Rendering…';status.textContent='ভিডিও তৈরি হচ্ছে। এই tab বন্ধ করবেন না।';
+ try{
+  await audio.play().catch(()=>{});
+  audio.pause();audio.currentTime=0;
+  const duration=Number.isFinite(audio.duration)&&audio.duration>0?audio.duration:60;
+  const W=format==='short'?720:1280,H=format==='short'?1280:720,fps=24;
+  const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const title=$('renderTitle').value.trim()||$('scriptTitle').value.trim()||'The Mystery';
+  const narration=(lang==='bn'?$ ('voiceTextBN').value:$('voiceTextEN').value).trim();
+  const chunks=narration.match(/[^.!?।\n]+[.!?।]?/g)||[narration];
+  const captions=chunks.map(x=>x.trim()).filter(Boolean);
+  const theme=$('renderTheme').value;
+  const palette=theme==='red'?['#260d18','#8d203c','#ff526e']:theme==='blue'?['#071626','#164b70','#65d9ff']:['#080b13','#263246','#f3bd63'];
+  const stream=canvas.captureStream(fps);
+  const audioStream=audio.captureStream?audio.captureStream():audio.mozCaptureStream?audio.mozCaptureStream():null;
+  if(audioStream)audioStream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  const mime=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  if(!mime)throw new Error('WebM recording format supported নয়।');
+  const recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:2500000});
+  const parts=[];recorder.ondataavailable=e=>{if(e.data.size)parts.push(e.data);};
+  const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=()=>reject(new Error('Browser recorder failed'));});
+  let start=performance.now();recorder.start(1000);
+  audio.currentTime=0;await audio.play();
+  function draw(now){
+   const elapsed=(now-start)/1000, progress=Math.min(1,elapsed/duration),idx=Math.min(captions.length-1,Math.floor(progress*captions.length));
+   const g=ctx.createLinearGradient(0,0,W,H);g.addColorStop(0,palette[0]);g.addColorStop(1,palette[1]);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+   const pulse=0.5+Math.sin(elapsed*1.2)*0.08;ctx.strokeStyle=palette[2];ctx.globalAlpha=.15;ctx.lineWidth=4;ctx.beginPath();ctx.arc(W/2,H*.34,Math.min(W,H)*pulse*.35,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;
+   ctx.fillStyle=palette[2];ctx.font='bold '+Math.round(W*.035)+'px Arial';ctx.textAlign='center';ctx.fillText('MYSTERYFLOW AI',W/2,H*.12);
+   ctx.fillStyle='#ffffff';ctx.font='bold '+Math.round(W*.055)+'px Arial';
+   const titleLines=wrapCanvasText(ctx,title,W*.82);titleLines.slice(0,3).forEach((l,i)=>ctx.fillText(l,W/2,H*.27+i*W*.065));
+   ctx.fillStyle='rgba(0,0,0,.62)';ctx.fillRect(W*.07,H*.68,W*.86,H*.2);
+   ctx.fillStyle='#fff';ctx.font='bold '+Math.round(W*.032)+'px Arial';
+   const lines=wrapCanvasText(ctx,captions[idx]||title,W*.78);lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,W/2,H*.75+i*W*.045));
+   ctx.fillStyle=palette[2];ctx.fillRect(W*.07,H*.92,W*.86,8);ctx.fillStyle='#fff';ctx.fillRect(W*.07,H*.92,W*.86*progress,8);
+   if(elapsed<duration&&!audio.ended)requestAnimationFrame(draw);else{audio.pause();recorder.stop();}
+  }
+  requestAnimationFrame(draw);
+  await done;
+  const blob=new Blob(parts,{type:'video/webm'}),url=URL.createObjectURL(blob);
+  const preview=$('renderPreview'),link=$('downloadRender');
+  preview.src=url;preview.style.display='block';link.href=url;link.style.display='block';
+  link.download=(title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'mysteryflow-video')+'.webm';
+  status.textContent='Render complete · '+Math.round(blob.size/1024/1024*10)/10+' MB · WebM file ready to preview/download.';
+ }catch(e){status.textContent='Render error: '+e.message;alert('ভিডিও render হয়নি: '+e.message);}
+ finally{btn.disabled=false;btn.textContent=old;}
+}
+$('renderVideo').onclick=renderBrowserVideo;
 
 render();
 </script></body></html>
